@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package patient;
+
+option java_package = "patient_service.grpc";
+option java_multiple_files = true;
+
+service PatientService {
+    rpc FindById(PatientRequest) returns (PatientResponse);
+}
+
+message PatientRequest {
+    int64 id = 1;
+}
+
+message PatientResponse {
+    int64 id = 1;
+    string name = 2;
+    string email = 3;
+}
