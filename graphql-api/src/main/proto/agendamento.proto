@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package agendamento;
+
+option java_package = "agendamento_service.grpc";
+option java_multiple_files = true;
+
+service AgendamentoService {
+    rpc Create(CreateConsultaRequest) returns (ConsultaResponse);
+    rpc Update(UpdateConsultaRequest) returns (ConsultaResponse);
+    rpc ListByPatient(ListByPatientRequest) returns (ConsultaListResponse);
+    rpc ListUpcomingByPatient(ListByPatientRequest) returns (ConsultaListResponse);
+}
+
+message CreateConsultaRequest {
+    int64 patientId = 1;
+    string doctorName = 2;
+    string dateTime = 3;
+    string reason = 4;
+}
+
+message UpdateConsultaRequest {
+    int64 id = 1;
+    string doctorName = 2;
+    string dateTime = 3;
+    string reason = 4;
+    string status = 5;
+}
+
+message ListByPatientRequest {
+    int64 patientId = 1;
+}
+
+message ConsultaResponse {
+    int64 id = 1;
+    int64 patientId = 2;
+    string doctorName = 3;
+    string dateTime = 4;
+    string status = 5;
+    string reason = 6;
+}
+
+message ConsultaListResponse {
+    repeated ConsultaResponse consultas = 1;
+}

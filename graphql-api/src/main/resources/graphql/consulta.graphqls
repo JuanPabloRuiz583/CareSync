@@ -1,0 +1,33 @@
+type Consulta {
+    id: ID!
+    patientId: ID!
+    doctorName: String!
+    dateTime: String!
+    status: String!
+    reason: String!
+}
+
+extend type Query {
+    consultasDoPaciente(patientId: ID!): [Consulta!]!
+    consultasFuturasDoPaciente(patientId: ID!): [Consulta!]!
+}
+
+type Mutation {
+    agendarConsulta(input: AgendarConsultaInput!): Consulta!
+    editarConsulta(input: EditarConsultaInput!): Consulta!
+}
+
+input AgendarConsultaInput {
+    patientId: ID!
+    doctorName: String!
+    dateTime: String!
+    reason: String!
+}
+
+input EditarConsultaInput {
+    id: ID!
+    doctorName: String!
+    dateTime: String!
+    reason: String!
+    status: String!
+}
