@@ -1,0 +1,33 @@
+services:
+  patient-service:
+    build: ./patient-service
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    networks:
+      - caresync-network
+
+  agendamento-service:
+    build: ./agendamento-service
+    ports:
+      - "8082:8082"
+      - "9091:9091"
+    networks:
+      - caresync-network
+
+  graphql-api:
+    build: ./graphql-api
+    ports:
+      - "8081:8081"
+    environment:
+      - PATIENT_SERVICE_HOST=patient-service
+      - AGENDAMENTO_SERVICE_HOST=agendamento-service
+    depends_on:
+      - patient-service
+      - agendamento-service
+    networks:
+      - caresync-network
+
+networks:
+  caresync-network:
+    driver: bridge

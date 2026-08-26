@@ -19,8 +19,8 @@ Backend de agendamento de consultas hospitalares, histórico de pacientes e (em 
                         ▼                   ▼
             ┌─────────────────────┐ ┌──────────────────────┐
             │   patient-service    │ │  agendamento-service  │
-            │   :8080 / :9090       │ │   :8082 / :9091         │
-            │   gRPC Server         │ │   gRPC Server           │
+            │   gRPC :9090          │ │   gRPC :9091            │
+            │   HTTP :8080 (H2 UI)  │ │   HTTP :8082 (H2 UI)    │
             │   H2 (patientdb)      │ │   H2 (agendamentodb)    │
             └─────────────────────┘ └──────────────────────┘
 ```
