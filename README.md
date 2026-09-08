@@ -46,6 +46,26 @@ Backend de agendamento de consultas hospitalares, histórico de pacientes e (em 
 - Expõe via gRPC: `Create`, `Update`, `ListByPatient` (histórico completo), `ListUpcomingByPatient` (só futuras).
 - **Não conhece o `patient-service`** — a validação de "esse paciente existe?" antes de criar uma consulta é feita no `graphql-api`, que é o único que fala com os dois.
 
+## Segurança
+
+Autenticação HTTP Basic, exigida em todo o `graphql-api`. Autorização por role, aplicada por operação GraphQL:
+
+| Operação | Médico | Enfermeiro | Paciente |
+|---|---|---|---|
+| `patient` | ✅ | ✅ | ✅ |
+| `consultasDoPaciente` / `consultasFuturasDoPaciente` | ✅ (qualquer paciente) | ✅ (qualquer paciente) | ✅ só as próprias |
+| `agendarConsulta` | ❌ | ✅ | ❌ |
+| `editarConsulta` | ✅ | ❌ | ❌ |
+
+Usuários de teste (em memória, senha `senha123` para todos):
+
+| Usuário | Role | Paciente vinculado |
+|---|---|---|
+| `medico1` | MEDICO | — |
+| `enfermeiro1` | ENFERMEIRO | — |
+| `paciente1` | PACIENTE | id 1 |
+| `paciente2` | PACIENTE | id 2 |
+
 ## Contratos gRPC (`.proto`)
 
 Cada `.proto` (`patient.proto`, `agendamento.proto`) é **duplicado** entre o serviço dono e o `graphql-api` — cliente e servidor geram suas próprias classes a partir do mesmo contrato, já que não existe módulo Maven compartilhado entre os projetos.
@@ -69,6 +89,12 @@ cd graphql-api && ./mvnw spring-boot:run
 
 GraphQL: `http://localhost:8081/graphql` — GraphiQL: `http://localhost:8081/graphiql`
 
+Ou via Docker Compose, subindo os 3 containers juntos:
+
+```bash
+docker compose up --build
+```
+
 ## Status dos requisitos da documentação do desafio
 
 | Requisito | Status |
@@ -77,6 +103,6 @@ GraphQL: `http://localhost:8081/graphql` — GraphiQL: `http://localhost:8081/gr
 | Serviço de Agendamento (criar/editar consulta) | ✅ |
 | Separação em serviços — Agendamento | ✅ |
 | Separação em serviços — Notificações | ⏳ pendente |
-| Segurança (Spring Security + níveis de acesso) | ⏳ pendente |
+| Segurança (Spring Security + níveis de acesso) | ✅ |
 | Comunicação assíncrona (RabbitMQ/Kafka) | ⏳ pendente |
 | Collection Postman/Insomnia | ⏳ pendente |
