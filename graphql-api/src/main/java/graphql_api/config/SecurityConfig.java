@@ -1,22 +1,21 @@
 package graphql_api.config;
 
-import graphql_api.security.AppUserDetails;
-import graphql_api.security.InMemoryAppUserDetailsService;
+import graphql_api.repository.AppUserRepository;
+import graphql_api.security.JpaUserDetailsService;
+import graphql_api.security.JwtAuthenticationFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-
-import java.util.List;
-import java.util.Map;
-
-import static org.springframework.security.config.Customizer.withDefaults;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableMethodSecurity
@@ -28,32 +27,31 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(PasswordEncoder passwordEncoder) {
-        Map<String, AppUserDetails> users = Map.of(
-                "medico1", new AppUserDetails(
-                        "medico1", passwordEncoder.encode("senha123"),
-                        List.of(new SimpleGrantedAuthority("ROLE_MEDICO")), null),
-                "enfermeiro1", new AppUserDetails(
-                        "enfermeiro1", passwordEncoder.encode("senha123"),
-                        List.of(new SimpleGrantedAuthority("ROLE_ENFERMEIRO")), null),
-                "paciente1", new AppUserDetails(
-                        "paciente1", passwordEncoder.encode("senha123"),
-                        List.of(new SimpleGrantedAuthority("ROLE_PACIENTE")), 1L),
-                "paciente2", new AppUserDetails(
-                        "paciente2", passwordEncoder.encode("senha123"),
-                        List.of(new SimpleGrantedAuthority("ROLE_PACIENTE")), 2L)
-        );
-
-        return new InMemoryAppUserDetailsService(users);
+    public UserDetailsService userDetailsService(AppUserRepository appUserRepository) {
+        return new JpaUserDetailsService(appUserRepository);
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(authz -> authz.anyRequest().authenticated())
-                .httpBasic(withDefaults());
+                .authorizeHttpRequests(authz -> authz
+                        .requestMatchers("/auth/login").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/h2-console/**").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        .anyRequest().authenticated())
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
+                .exceptionHandling(ex -> ex.authenticationEntryPoint(
+                        (request, response, authException) ->
+                                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")))
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }

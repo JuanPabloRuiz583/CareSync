@@ -1,0 +1,676 @@
+{
+  "info": {
+    "_postman_id": "b4a1e7f0-5c2a-4e3d-9a1b-caresync000001",
+    "name": "CareSync",
+    "description": "Collection de testes da API CareSync (Tech Challenge Fase 3). Cobre login (JWT), gestão de usuários (ADMIN), consultas de Patient e Consulta via GraphQL, e os cenários negativos de autenticação/autorização.\n\nComo usar:\n1. Rode os requests da pasta \"Auth\" primeiro — cada um salva o token do respectivo usuário numa variável da collection (ex: {{adminToken}}), usada automaticamente nos demais requests.\n2. baseUrl aponta para http://localhost:8081 (graphql-api). Ajuste se estiver rodando em outra porta/host.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8081", "type": "string" },
+    { "key": "adminToken", "value": "", "type": "string" },
+    { "key": "medicoToken", "value": "", "type": "string" },
+    { "key": "enfermeiroToken", "value": "", "type": "string" },
+    { "key": "paciente1Token", "value": "", "type": "string" },
+    { "key": "paciente2Token", "value": "", "type": "string" },
+    { "key": "createdUserId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login - Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.json().token;",
+                  "pm.collectionVariables.set('adminToken', token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin1\",\n  \"password\": \"senha123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Autentica como ADMIN e guarda o token em {{adminToken}}."
+          }
+        },
+        {
+          "name": "Login - Medico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.json().token;",
+                  "pm.collectionVariables.set('medicoToken', token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"medico1\",\n  \"password\": \"senha123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Autentica como MEDICO e guarda o token em {{medicoToken}}."
+          }
+        },
+        {
+          "name": "Login - Enfermeiro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.json().token;",
+                  "pm.collectionVariables.set('enfermeiroToken', token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"enfermeiro1\",\n  \"password\": \"senha123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Autentica como ENFERMEIRO e guarda o token em {{enfermeiroToken}}."
+          }
+        },
+        {
+          "name": "Login - Paciente 1",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.json().token;",
+                  "pm.collectionVariables.set('paciente1Token', token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"paciente1\",\n  \"password\": \"senha123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Autentica como PACIENTE (vinculado ao patientId 1) e guarda o token em {{paciente1Token}}."
+          }
+        },
+        {
+          "name": "Login - Paciente 2",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const token = pm.response.json().token;",
+                  "pm.collectionVariables.set('paciente2Token', token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"paciente2\",\n  \"password\": \"senha123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Autentica como PACIENTE (vinculado ao patientId 2) e guarda o token em {{paciente2Token}}."
+          }
+        },
+        {
+          "name": "[Negativo] Login - Senha errada",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"medico1\",\n  \"password\": \"senhaErrada\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Credenciais inválidas devem retornar 401."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios (ADMIN)",
+      "item": [
+        {
+          "name": "Criar Usuario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const id = pm.response.json().id;",
+                  "pm.collectionVariables.set('createdUserId', id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"enfermeiro2\",\n  \"password\": \"senha123\",\n  \"role\": \"ENFERMEIRO\",\n  \"patientId\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "Cria um novo usuário. Só ADMIN pode chamar. Salva o id criado em {{createdUserId}} para o teste de delete."
+          }
+        },
+        {
+          "name": "Listar Usuarios",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "Lista todos os usuários. Só ADMIN pode chamar."
+          }
+        },
+        {
+          "name": "Deletar Usuario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{createdUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{createdUserId}}"]
+            },
+            "description": "Remove o usuário criado no request \"Criar Usuario\" (usa {{createdUserId}})."
+          }
+        },
+        {
+          "name": "[Negativo] Listar Usuarios como Medico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{medicoToken}}", "type": "string" }]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"]
+            },
+            "description": "MEDICO não tem role ADMIN — deve ser bloqueado com 403."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Patient (GraphQL)",
+      "item": [
+        {
+          "name": "Buscar Paciente por ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{medicoToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  patient(id: 1) {\n    id\n    name\n    email\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql",
+              "host": ["{{baseUrl}}"],
+              "path": ["graphql"]
+            },
+            "description": "Qualquer role autenticada pode consultar um paciente por id."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consultas (GraphQL)",
+      "item": [
+        {
+          "name": "Historico Completo - Medico",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{medicoToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  consultasDoPaciente(patientId: 1) {\n    id\n    doctorName\n    dateTime\n    status\n    reason\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "Médico e Enfermeiro podem ver o histórico de qualquer paciente."
+          }
+        },
+        {
+          "name": "Consultas Futuras - Enfermeiro",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{enfermeiroToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  consultasFuturasDoPaciente(patientId: 1) {\n    id\n    doctorName\n    dateTime\n    status\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] }
+          }
+        },
+        {
+          "name": "Paciente ve as proprias consultas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sem erro FORBIDDEN', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.errors).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{paciente1Token}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  consultasDoPaciente(patientId: 1) {\n    id\n    doctorName\n    status\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "paciente1 (vinculado ao patientId 1) consultando o próprio histórico — deve funcionar."
+          }
+        },
+        {
+          "name": "[Negativo] Paciente tenta ver consultas de outro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Retorna erro FORBIDDEN', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.errors[0].extensions.classification).to.eql('FORBIDDEN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{paciente1Token}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  consultasDoPaciente(patientId: 2) {\n    id\n    doctorName\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "paciente1 tentando ver consultas do patientId 2 — deve ser bloqueado (FORBIDDEN)."
+          }
+        },
+        {
+          "name": "Agendar Consulta - Enfermeiro",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sem erro FORBIDDEN', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.errors).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{enfermeiroToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  agendarConsulta(input: {\n    patientId: 1,\n    doctorName: \"Dr. Teste\",\n    dateTime: \"2026-10-01T10:00:00\",\n    reason: \"Checkup\"\n  }) {\n    id\n    status\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "Só ENFERMEIRO pode registrar uma nova consulta."
+          }
+        },
+        {
+          "name": "[Negativo] Medico tenta agendar consulta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Retorna erro FORBIDDEN', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.errors[0].extensions.classification).to.eql('FORBIDDEN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{medicoToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  agendarConsulta(input: {\n    patientId: 1,\n    doctorName: \"Dr. Teste\",\n    dateTime: \"2026-10-01T10:00:00\",\n    reason: \"Checkup\"\n  }) {\n    id\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "MEDICO não pode registrar consulta — deve ser bloqueado (FORBIDDEN)."
+          }
+        },
+        {
+          "name": "Editar Consulta - Medico",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Sem erro FORBIDDEN', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.errors).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{medicoToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  editarConsulta(input: {\n    id: 1,\n    doctorName: \"Dr. Carlos Lima\",\n    dateTime: \"2026-08-08T19:30:12\",\n    reason: \"Revisado\",\n    status: \"COMPLETED\"\n  }) {\n    id\n    status\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "Só MEDICO pode editar uma consulta existente."
+          }
+        },
+        {
+          "name": "[Negativo] Enfermeiro tenta editar consulta",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Retorna erro FORBIDDEN', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.errors[0].extensions.classification).to.eql('FORBIDDEN');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "{{enfermeiroToken}}", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  editarConsulta(input: {\n    id: 1,\n    doctorName: \"X\",\n    dateTime: \"2026-08-08T19:30:12\",\n    reason: \"Y\",\n    status: \"CANCELED\"\n  }) {\n    id\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "ENFERMEIRO não pode editar consulta — deve ser bloqueado (FORBIDDEN)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Testes de Seguranca",
+      "item": [
+        {
+          "name": "[Negativo] Sem token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query { patient(id: 1) { id } }",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "Nenhum header Authorization — deve retornar 401."
+          }
+        },
+        {
+          "name": "[Negativo] Token invalido",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{ "key": "token", "value": "token.invalido.forjado", "type": "string" }]
+            },
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query { patient(id: 1) { id } }",
+                "variables": ""
+              }
+            },
+            "url": { "raw": "{{baseUrl}}/graphql", "host": ["{{baseUrl}}"], "path": ["graphql"] },
+            "description": "Token malformado/forjado — deve retornar 401."
+          }
+        }
+      ]
+    }
+  ]
+}

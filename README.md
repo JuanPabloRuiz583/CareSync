@@ -48,23 +48,36 @@ Backend de agendamento de consultas hospitalares, histórico de pacientes e (em 
 
 ## Segurança
 
-Autenticação HTTP Basic, exigida em todo o `graphql-api`. Autorização por role, aplicada por operação GraphQL:
+Autenticação via **JWT**: `POST /auth/login` (usuário/senha) devolve um token, que deve ser enviado em `Authorization: Bearer <token>` em toda chamada ao `/graphql`. Usuários persistidos em banco (H2, `usersdb`), senha em hash BCrypt. Autorização por role, aplicada por operação GraphQL:
 
 | Operação | Médico | Enfermeiro | Paciente |
 |---|---|---|---|
-| `patient` | ✅ | ✅ | ✅ |
+| `patient` | ✅ (qualquer paciente) | ✅ (qualquer paciente) | ✅ só o próprio |
 | `consultasDoPaciente` / `consultasFuturasDoPaciente` | ✅ (qualquer paciente) | ✅ (qualquer paciente) | ✅ só as próprias |
 | `agendarConsulta` | ❌ | ✅ | ❌ |
 | `editarConsulta` | ✅ | ❌ | ❌ |
 
-Usuários de teste (em memória, senha `senha123` para todos):
+Usuários de teste (populados no banco na inicialização, senha `senha123` para todos):
 
 | Usuário | Role | Paciente vinculado |
 |---|---|---|
+| `admin1` | ADMIN | — |
 | `medico1` | MEDICO | — |
 | `enfermeiro1` | ENFERMEIRO | — |
 | `paciente1` | PACIENTE | id 1 |
 | `paciente2` | PACIENTE | id 2 |
+
+### Gestão de usuários (só `ADMIN`)
+
+| Endpoint | Descrição |
+|---|---|
+| `POST /users` | cria usuário — body `{username, password, role, patientId}` |
+| `GET /users` | lista todos os usuários |
+| `DELETE /users/{id}` | remove um usuário |
+
+## Documentação da API REST (Swagger)
+
+`/auth/login` e `/users/*` (endpoints REST) documentados automaticamente via Swagger UI: `http://localhost:8081/swagger-ui/index.html`. O `/graphql` tem sua própria documentação, via GraphiQL/introspection — Swagger não se aplica a operações GraphQL.
 
 ## Contratos gRPC (`.proto`)
 
@@ -105,4 +118,4 @@ docker compose up --build
 | Separação em serviços — Notificações | ⏳ pendente |
 | Segurança (Spring Security + níveis de acesso) | ✅ |
 | Comunicação assíncrona (RabbitMQ/Kafka) | ⏳ pendente |
-| Collection Postman/Insomnia | ⏳ pendente |
+| Collection Postman/Insomnia | ✅ [`CareSync.postman_collection.json`](CareSync.postman_collection.json) |
