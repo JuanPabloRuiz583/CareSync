@@ -1,13 +1,17 @@
 package agendamento_service.grpc;
 
+import agendamento_service.config.RabbitMQConfig;
 import agendamento_service.domain.Consulta;
 import agendamento_service.domain.ConsultaStatus;
+import agendamento_service.event.ConsultaEvent;
 import agendamento_service.repository.ConsultaRepository;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.grpc.server.service.GrpcService;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -16,9 +20,11 @@ import java.util.stream.Collectors;
 public class AgendamentoGrpcService extends AgendamentoServiceGrpc.AgendamentoServiceImplBase {
 
     private final ConsultaRepository consultaRepository;
+    private final RabbitTemplate rabbitTemplate;
 
-    public AgendamentoGrpcService(ConsultaRepository consultaRepository) {
+    public AgendamentoGrpcService(ConsultaRepository consultaRepository, RabbitTemplate rabbitTemplate) {
         this.consultaRepository = consultaRepository;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     @Override
@@ -30,6 +36,7 @@ public class AgendamentoGrpcService extends AgendamentoServiceGrpc.AgendamentoSe
                 request.getReason());
 
         consultaRepository.save(consulta);
+        publishEvent(consulta, "CREATED", RabbitMQConfig.ROUTING_KEY_CREATED);
 
         responseObserver.onNext(ConsultaGrpcMapper.toResponse(consulta));
         responseObserver.onCompleted();
@@ -54,6 +61,7 @@ public class AgendamentoGrpcService extends AgendamentoServiceGrpc.AgendamentoSe
                 ConsultaStatus.valueOf(request.getStatus()));
 
         consultaRepository.save(consulta);
+        publishEvent(consulta, "UPDATED", RabbitMQConfig.ROUTING_KEY_UPDATED);
 
         responseObserver.onNext(ConsultaGrpcMapper.toResponse(consulta));
         responseObserver.onCompleted();
@@ -80,5 +88,17 @@ public class AgendamentoGrpcService extends AgendamentoServiceGrpc.AgendamentoSe
 
         responseObserver.onNext(ConsultaListResponse.newBuilder().addAllConsultas(consultas).build());
         responseObserver.onCompleted();
+    }
+
+    private void publishEvent(Consulta consulta, String eventType, String routingKey) {
+        ConsultaEvent event = new ConsultaEvent(
+                consulta.getId(),
+                consulta.getPatientId(),
+                consulta.getDoctorName(),
+                consulta.getDateTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+                consulta.getReason(),
+                eventType);
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, routingKey, event);
     }
 }

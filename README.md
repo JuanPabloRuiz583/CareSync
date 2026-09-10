@@ -1,6 +1,6 @@
 # CareSync
 
-Backend de agendamento de consultas hospitalares, histórico de pacientes e (em desenvolvimento) notificações automáticas. Arquitetura de microsserviços em Spring Boot combinando **GraphQL** (porta de entrada única, client-facing) e **gRPC** (comunicação interna entre serviços).
+Backend de agendamento de consultas hospitalares, histórico de pacientes e notificações automáticas. Arquitetura de microsserviços em Spring Boot combinando **GraphQL** (porta de entrada única, client-facing), **gRPC** (comunicação interna síncrona) e **RabbitMQ** (comunicação assíncrona).
 
 ## Arquitetura
 
@@ -22,14 +22,30 @@ Backend de agendamento de consultas hospitalares, histórico de pacientes e (em 
             │   gRPC :9090          │ │   gRPC :9091            │
             │   HTTP :8080 (H2 UI)  │ │   HTTP :8082 (H2 UI)    │
             │   H2 (patientdb)      │ │   H2 (agendamentodb)    │
-            └─────────────────────┘ └──────────────────────┘
+            └─────────────────────┘ └───────────┬──────────┘
+                                                  │ publica evento
+                                                  │ (consulta.created / consulta.updated)
+                                                  ▼
+                                       ┌────────────────────┐
+                                       │      RabbitMQ        │  :5672 (AMQP) / :15672 (painel)
+                                       │  exchange: consulta.exchange
+                                       │  fila: notificacao.queue
+                                       └──────────┬──────────┘
+                                                  │ consome
+                                                  ▼
+                                       ┌────────────────────┐
+                                       │ notificacao-service   │  sem porta exposta —
+                                       │  (@RabbitListener)     │  só escuta a fila
+                                       └────────────────────┘
 ```
 
 - **`graphql-api` é a única porta de entrada.** O cliente nunca fala direto com `patient-service` ou `agendamento-service`.
 - **`patient-service` e `agendamento-service` são servidores gRPC puros**, cada um dono do próprio banco H2, e **não se conhecem entre si**.
+- **`agendamento-service` nunca fala diretamente com `notificacao-service`** — só publica um evento no RabbitMQ; quem consome nem quando isso acontece é problema do produtor (comunicação assíncrona de verdade).
+- **`notificacao-service` não expõe HTTP nem gRPC** — é um serviço "de fundo", só reage a eventos da fila.
 - Cada serviço é um **projeto Maven independente** (`pom.xml` e Maven Wrapper próprios), sem módulo pai compartilhado — versionamento e deploy independentes.
 
-## Os 3 serviços
+## Os 4 serviços
 
 ### `graphql-api` — porta de entrada (HTTP 8081)
 - Expõe a API GraphQL (`POST /graphql`, GraphiQL em `/graphiql`).
@@ -45,6 +61,19 @@ Backend de agendamento de consultas hospitalares, histórico de pacientes e (em 
 - Persiste `Consulta` (paciente, médico, data/hora, status, motivo) em H2 (`agendamentodb`) via JPA/Hibernate.
 - Expõe via gRPC: `Create`, `Update`, `ListByPatient` (histórico completo), `ListUpcomingByPatient` (só futuras).
 - **Não conhece o `patient-service`** — a validação de "esse paciente existe?" antes de criar uma consulta é feita no `graphql-api`, que é o único que fala com os dois.
+- Ao criar ou editar uma consulta, publica um evento `ConsultaEvent` no RabbitMQ (routing key `consulta.created` ou `consulta.updated`).
+
+### `notificacao-service` — consumidor de eventos (sem porta exposta)
+- Não tem banco de dados, não expõe nenhuma API (nem HTTP, nem gRPC) — só um `@RabbitListener` ouvindo a `notificacao.queue`.
+- Ao receber um evento, "envia o lembrete" ao paciente (simulado via log estruturado, já que não há integração real de SMS/e-mail).
+
+## Comunicação Assíncrona (RabbitMQ)
+
+- **Exchange**: `consulta.exchange` (tipo `topic`)
+- **Fila**: `notificacao.queue`, ligada ao exchange com o binding `consulta.*`
+- **Routing keys**: `consulta.created` (ao criar) e `consulta.updated` (ao editar) — ambas caem na mesma fila graças ao padrão `*` do binding
+- Mensagens serializadas em **JSON** (`Jackson2JsonMessageConverter`)
+- Painel de administração: `http://localhost:15672` (usuário/senha: `guest`/`guest`)
 
 ## Segurança
 
@@ -89,24 +118,27 @@ Cada `.proto` (`patient.proto`, `agendamento.proto`) é **duplicado** entre o se
 - Spring for GraphQL (`spring-boot-starter-graphql`)
 - gRPC nativo do Spring Boot 4.1 (`spring-boot-starter-grpc-server` / `spring-boot-starter-grpc-client`) + Protocol Buffers (`protobuf-maven-plugin`)
 - Spring Data JPA + H2 (um banco em memória por serviço)
+- RabbitMQ (`spring-boot-starter-amqp`) — comunicação assíncrona entre `agendamento-service` e `notificacao-service`
+- Spring Security + JWT (`io.jsonwebtoken:jjwt`)
 
 ## Como rodar
 
-Cada serviço sobe independente. Suba os 3 (o `graphql-api` só responde de verdade com os outros dois já no ar):
-
-```bash
-cd patient-service && ./mvnw spring-boot:run
-cd agendamento-service && ./mvnw spring-boot:run
-cd graphql-api && ./mvnw spring-boot:run
-```
-
-GraphQL: `http://localhost:8081/graphql` — GraphiQL: `http://localhost:8081/graphiql`
-
-Ou via Docker Compose, subindo os 3 containers juntos:
+**Mais simples: Docker Compose**, sobe RabbitMQ + os 4 serviços juntos, na ordem certa:
 
 ```bash
 docker compose up --build
 ```
+
+Ou local — precisa do RabbitMQ rodando antes (`docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:4-management`), depois:
+
+```bash
+cd patient-service && ./mvnw spring-boot:run
+cd agendamento-service && ./mvnw spring-boot:run
+cd notificacao-service && ./mvnw spring-boot:run
+cd graphql-api && ./mvnw spring-boot:run
+```
+
+GraphQL: `http://localhost:8081/graphql` — GraphiQL: `http://localhost:8081/graphiql`
 
 ## Status dos requisitos da documentação do desafio
 
@@ -115,7 +147,7 @@ docker compose up --build
 | GraphQL (consultas flexíveis, histórico/futuras) | ✅ |
 | Serviço de Agendamento (criar/editar consulta) | ✅ |
 | Separação em serviços — Agendamento | ✅ |
-| Separação em serviços — Notificações | ⏳ pendente |
+| Separação em serviços — Notificações | ✅ |
 | Segurança (Spring Security + níveis de acesso) | ✅ |
-| Comunicação assíncrona (RabbitMQ/Kafka) | ⏳ pendente |
+| Comunicação assíncrona (RabbitMQ/Kafka) | ✅ RabbitMQ |
 | Collection Postman/Insomnia | ✅ [`CareSync.postman_collection.json`](CareSync.postman_collection.json) |

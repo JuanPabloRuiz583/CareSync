@@ -8,6 +8,7 @@
         <option value="$PROJECT_DIR$/graphql-api/pom.xml" />
         <option value="$PROJECT_DIR$/patient-service/pom.xml" />
         <option value="$PROJECT_DIR$/agendamento-service/pom.xml" />
+        <option value="$PROJECT_DIR$/notificacao-service/pom.xml" />
       </list>
     </option>
   </component>

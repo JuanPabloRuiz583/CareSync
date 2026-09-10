@@ -1,4 +1,12 @@
 services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - caresync-network
+
   patient-service:
     build: ./patient-service
     ports:
@@ -12,6 +20,19 @@ services:
     ports:
       - "8082:8082"
       - "9091:9091"
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - rabbitmq
+    networks:
+      - caresync-network
+
+  notificacao-service:
+    build: ./notificacao-service
+    environment:
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - rabbitmq
     networks:
       - caresync-network
 
