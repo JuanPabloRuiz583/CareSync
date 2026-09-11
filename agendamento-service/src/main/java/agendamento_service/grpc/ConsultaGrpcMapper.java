@@ -6,6 +6,8 @@ import java.time.format.DateTimeFormatter;
 
 public class ConsultaGrpcMapper {
 
+    private ConsultaGrpcMapper() {}
+
     public static ConsultaResponse toResponse(Consulta consulta) {
         return ConsultaResponse.newBuilder()
                 .setId(consulta.getId())

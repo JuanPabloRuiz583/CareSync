@@ -4,6 +4,7 @@ import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
@@ -14,6 +15,8 @@ public class RabbitMQConfig {
 
     public static final String EXCHANGE = "consulta.exchange";
     public static final String QUEUE = "notificacao.queue";
+    public static final String DEAD_LETTER_EXCHANGE = "notificacao.dlx";
+    public static final String DEAD_LETTER_QUEUE = "notificacao.dlq";
 
     @Bean
     public TopicExchange consultaExchange() {
@@ -22,7 +25,8 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue notificacaoQueue() {
-        return new Queue(QUEUE, true);
+        return org.springframework.amqp.core.QueueBuilder.durable(QUEUE)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE).deadLetterRoutingKey(DEAD_LETTER_QUEUE).build();
     }
 
     @Bean
@@ -33,5 +37,11 @@ public class RabbitMQConfig {
     @Bean
     public MessageConverter messageConverter() {
         return new Jackson2JsonMessageConverter();
+    }
+
+    @Bean public DirectExchange deadLetterExchange() { return new DirectExchange(DEAD_LETTER_EXCHANGE); }
+    @Bean public Queue deadLetterQueue() { return new Queue(DEAD_LETTER_QUEUE, true); }
+    @Bean public Binding deadLetterBinding(Queue deadLetterQueue, DirectExchange deadLetterExchange) {
+        return BindingBuilder.bind(deadLetterQueue).to(deadLetterExchange).with(DEAD_LETTER_QUEUE);
     }
 }

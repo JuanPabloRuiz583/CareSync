@@ -3,32 +3,27 @@ package patient_service.grpc;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.springframework.grpc.server.service.GrpcService;
-import patient_service.domain.Patient;
-import patient_service.repository.PatientRepository;
-
-import java.util.Optional;
+import patient_service.application.port.in.FindPatientUseCase;
 
 @GrpcService
 public class PatientGrpcService extends PatientServiceGrpc.PatientServiceImplBase {
 
-    private final PatientRepository patientRepository;
+    private final FindPatientUseCase findPatientUseCase;
 
-    public PatientGrpcService(PatientRepository patientRepository) {
-        this.patientRepository = patientRepository;
+    public PatientGrpcService(FindPatientUseCase findPatientUseCase) {
+        this.findPatientUseCase = findPatientUseCase;
     }
 
     @Override
     public void findById(PatientRequest request, StreamObserver<PatientResponse> responseObserver) {
-        Optional<Patient> patient = patientRepository.findById(request.getId());
-
-        if (patient.isEmpty()) {
+        try {
+            var patient = findPatientUseCase.findById(request.getId());
+            responseObserver.onNext(PatientGrpcMapper.toResponse(patient));
+            responseObserver.onCompleted();
+        } catch (IllegalArgumentException exception) {
             responseObserver.onError(Status.NOT_FOUND
-                    .withDescription("Patient not found: id=" + request.getId())
+                    .withDescription(exception.getMessage())
                     .asRuntimeException());
-            return;
         }
-
-        responseObserver.onNext(PatientGrpcMapper.toResponse(patient.get()));
-        responseObserver.onCompleted();
     }
 }

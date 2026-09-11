@@ -1,54 +1,62 @@
 services:
+  patient-db:
+    image: postgres:17-alpine
+    environment: { POSTGRES_DB: patientdb, POSTGRES_USER: caresync, POSTGRES_PASSWORD: caresync }
+    ports: ["5432:5432"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U caresync -d patientdb"], interval: 5s, timeout: 3s, retries: 15 }
+    volumes: ["patient-data:/var/lib/postgresql/data"]
+    networks: [caresync-network]
+  agendamento-db:
+    image: postgres:17-alpine
+    environment: { POSTGRES_DB: agendamentodb, POSTGRES_USER: caresync, POSTGRES_PASSWORD: caresync }
+    ports: ["5433:5432"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U caresync -d agendamentodb"], interval: 5s, timeout: 3s, retries: 15 }
+    volumes: ["agendamento-data:/var/lib/postgresql/data"]
+    networks: [caresync-network]
+  auth-db:
+    image: postgres:17-alpine
+    environment: { POSTGRES_DB: authdb, POSTGRES_USER: caresync, POSTGRES_PASSWORD: caresync }
+    ports: ["5434:5432"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U caresync -d authdb"], interval: 5s, timeout: 3s, retries: 15 }
+    volumes: ["auth-data:/var/lib/postgresql/data"]
+    networks: [caresync-network]
   rabbitmq:
     image: rabbitmq:4-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    networks:
-      - caresync-network
-
+    ports: ["5672:5672", "15672:15672"]
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 5s, timeout: 5s, retries: 15 }
+    networks: [caresync-network]
   patient-service:
     build: ./patient-service
-    ports:
-      - "8080:8080"
-      - "9090:9090"
-    networks:
-      - caresync-network
-
+    ports: ["8080:8080", "9090:9090"]
+    environment: { PATIENT_DB_URL: "jdbc:postgresql://patient-db:5432/patientdb", PATIENT_DB_USER: caresync, PATIENT_DB_PASSWORD: caresync }
+    depends_on: { patient-db: { condition: service_healthy } }
+    networks: [caresync-network]
   agendamento-service:
     build: ./agendamento-service
-    ports:
-      - "8082:8082"
-      - "9091:9091"
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-    depends_on:
-      - rabbitmq
-    networks:
-      - caresync-network
-
+    ports: ["8082:8082", "9091:9091"]
+    environment: { AGENDAMENTO_DB_URL: "jdbc:postgresql://agendamento-db:5432/agendamentodb", AGENDAMENTO_DB_USER: caresync, AGENDAMENTO_DB_PASSWORD: caresync, RABBITMQ_HOST: rabbitmq }
+    depends_on: { agendamento-db: { condition: service_healthy }, rabbitmq: { condition: service_healthy } }
+    networks: [caresync-network]
   notificacao-service:
     build: ./notificacao-service
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-    depends_on:
-      - rabbitmq
-    networks:
-      - caresync-network
-
+    environment: { RABBITMQ_HOST: rabbitmq }
+    depends_on: { rabbitmq: { condition: service_healthy } }
+    networks: [caresync-network]
   graphql-api:
     build: ./graphql-api
-    ports:
-      - "8081:8081"
+    ports: ["8081:8081"]
     environment:
-      - PATIENT_SERVICE_HOST=patient-service
-      - AGENDAMENTO_SERVICE_HOST=agendamento-service
-    depends_on:
-      - patient-service
-      - agendamento-service
-    networks:
-      - caresync-network
-
+      AUTH_DB_URL: "jdbc:postgresql://auth-db:5432/authdb"
+      AUTH_DB_USER: caresync
+      AUTH_DB_PASSWORD: caresync
+      PATIENT_SERVICE_HOST: patient-service
+      AGENDAMENTO_SERVICE_HOST: agendamento-service
+      JWT_SECRET: "oN3/gkdGOWKQ2zvz3oKZnTJUU3VtSAlPTUDdKypyLPw="
+    depends_on: { auth-db: { condition: service_healthy }, patient-service: { condition: service_started }, agendamento-service: { condition: service_started } }
+    networks: [caresync-network]
+volumes:
+  patient-data:
+  agendamento-data:
+  auth-data:
 networks:
-  caresync-network:
-    driver: bridge
+  caresync-network: { driver: bridge }
