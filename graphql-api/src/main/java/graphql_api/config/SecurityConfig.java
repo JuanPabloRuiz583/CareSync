@@ -1,6 +1,6 @@
 package graphql_api.config;
 
-import graphql_api.repository.AppUserRepository;
+import graphql_api.application.port.out.UserRepositoryPort;
 import graphql_api.security.JpaUserDetailsService;
 import graphql_api.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,7 +27,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public UserDetailsService userDetailsService(AppUserRepository appUserRepository) {
+    public UserDetailsService userDetailsService(UserRepositoryPort appUserRepository) {
         return new JpaUserDetailsService(appUserRepository);
     }
 
@@ -44,10 +44,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers("/auth/login").permitAll()
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-                        .requestMatchers("/h2-console/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
                 .exceptionHandling(ex -> ex.authenticationEntryPoint(
                         (request, response, authException) ->
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")))

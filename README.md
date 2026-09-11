@@ -1,153 +1,165 @@
 # CareSync
 
-Backend de agendamento de consultas hospitalares, histórico de pacientes e notificações automáticas. Arquitetura de microsserviços em Spring Boot combinando **GraphQL** (porta de entrada única, client-facing), **gRPC** (comunicação interna síncrona) e **RabbitMQ** (comunicação assíncrona).
+[![Java](https://img.shields.io/badge/Java-17-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![GraphQL](https://img.shields.io/badge/GraphQL-API-E10098?logo=graphql&logoColor=white)](https://graphql.org/)
+[![gRPC](https://img.shields.io/badge/gRPC-Protobuf-244C5A?logo=google&logoColor=white)](https://grpc.io/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![RabbitMQ](https://img.shields.io/badge/RabbitMQ-4-FF6600?logo=rabbitmq&logoColor=white)](https://www.rabbitmq.com/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![JaCoCo](https://img.shields.io/badge/JaCoCo-%E2%89%A595%25-brightgreen)](https://www.jacoco.org/jacoco/)
+
+Backend hospitalar modular para autenticação por perfil, consulta de pacientes e históricos, agendamento de consultas e notificações assíncronas. A entrada pública combina REST para autenticação/administração e GraphQL para pacientes e consultas; a comunicação interna usa gRPC e RabbitMQ.
 
 ## Arquitetura
 
-```
-                       CLIENTE (Postman / navegador)
-                                 │
-                                 │ HTTP + GraphQL
-                                 ▼
-                       ┌────────────────────┐
-                       │     graphql-api     │  :8081
-                       │   GraphQL Server    │
-                       │    gRPC Client      │
-                       └──────────┬──────────┘
-                        ┌─────────┴─────────┐
-                        │ gRPC              │ gRPC
-                        ▼                   ▼
-            ┌─────────────────────┐ ┌──────────────────────┐
-            │   patient-service    │ │  agendamento-service  │
-            │   gRPC :9090          │ │   gRPC :9091            │
-            │   HTTP :8080 (H2 UI)  │ │   HTTP :8082 (H2 UI)    │
-            │   H2 (patientdb)      │ │   H2 (agendamentodb)    │
-            └─────────────────────┘ └───────────┬──────────┘
-                                                  │ publica evento
-                                                  │ (consulta.created / consulta.updated)
-                                                  ▼
-                                       ┌────────────────────┐
-                                       │      RabbitMQ        │  :5672 (AMQP) / :15672 (painel)
-                                       │  exchange: consulta.exchange
-                                       │  fila: notificacao.queue
-                                       └──────────┬──────────┘
-                                                  │ consome
-                                                  ▼
-                                       ┌────────────────────┐
-                                       │ notificacao-service   │  sem porta exposta —
-                                       │  (@RabbitListener)     │  só escuta a fila
-                                       └────────────────────┘
+```mermaid
+flowchart LR
+    C[Cliente / Postman] -->|REST + GraphQL + JWT| G[graphql-api :8081]
+    G -->|gRPC :9090| P[patient-service]
+    G -->|gRPC :9091| A[agendamento-service]
+    P --> PDB[(PostgreSQL patientdb)]
+    A --> ADB[(PostgreSQL agendamentodb)]
+    G --> UDB[(PostgreSQL authdb)]
+    A -->|consulta.created / consulta.updated| R[(RabbitMQ)]
+    R --> N[notificacao-service]
+    N -->|porta NotificationSender| L[Log estruturado]
 ```
 
-- **`graphql-api` é a única porta de entrada.** O cliente nunca fala direto com `patient-service` ou `agendamento-service`.
-- **`patient-service` e `agendamento-service` são servidores gRPC puros**, cada um dono do próprio banco H2, e **não se conhecem entre si**.
-- **`agendamento-service` nunca fala diretamente com `notificacao-service`** — só publica um evento no RabbitMQ; quem consome nem quando isso acontece é problema do produtor (comunicação assíncrona de verdade).
-- **`notificacao-service` não expõe HTTP nem gRPC** — é um serviço "de fundo", só reage a eventos da fila.
-- Cada serviço é um **projeto Maven independente** (`pom.xml` e Maven Wrapper próprios), sem módulo pai compartilhado — versionamento e deploy independentes.
+Cada serviço segue arquitetura hexagonal:
 
-## Os 4 serviços
+```mermaid
+flowchart LR
+    IN[Adaptadores de entrada<br/>REST / GraphQL / gRPC / RabbitMQ]
+    UC[Aplicação<br/>casos de uso e portas]
+    D[Domínio<br/>modelos e regras]
+    OUT[Adaptadores de saída<br/>JPA / gRPC / RabbitMQ / JWT / Log]
+    IN --> UC
+    UC --> D
+    UC -->|interfaces de saída| OUT
+    OUT -. implementa .-> UC
+```
 
-### `graphql-api` — porta de entrada (HTTP 8081)
-- Expõe a API GraphQL (`POST /graphql`, GraphiQL em `/graphiql`).
-- Não tem banco de dados nem lógica de persistência própria.
-- É **gRPC client** dos outros dois serviços: traduz queries/mutations GraphQL em chamadas gRPC internas e devolve o resultado combinado.
-- Camadas internas: `Controller` (`@QueryMapping`/`@MutationMapping`) → `Service` (orquestração, validações entre serviços) → `Mapper` (proto ↔ DTO GraphQL).
+| Serviço | Responsabilidade | Entrada | Saídas | Persistência |
+|---|---|---|---|---|
+| `graphql-api` | Gateway, JWT, autorização e usuários | REST/GraphQL `:8081` | gRPC, JWT, BCrypt | PostgreSQL `authdb` |
+| `patient-service` | Consulta de pacientes | gRPC `:9090` | JPA | PostgreSQL `patientdb` |
+| `agendamento-service` | Criar, editar e listar consultas | gRPC `:9091` | JPA e RabbitMQ | PostgreSQL `agendamentodb` |
+| `notificacao-service` | Consumir eventos e enviar lembrete simulado | RabbitMQ | Log estruturado | Stateless |
 
-### `patient-service` — dono de `Patient` (HTTP 8080 / gRPC 9090)
-- Persiste `Patient` (id, nome, email) em H2 (`patientdb`) via JPA/Hibernate.
-- Expõe uma única operação gRPC: `FindById`.
+### Fluxo de agendamento
 
-### `agendamento-service` — dono de `Consulta` (HTTP 8082 / gRPC 9091)
-- Persiste `Consulta` (paciente, médico, data/hora, status, motivo) em H2 (`agendamentodb`) via JPA/Hibernate.
-- Expõe via gRPC: `Create`, `Update`, `ListByPatient` (histórico completo), `ListUpcomingByPatient` (só futuras).
-- **Não conhece o `patient-service`** — a validação de "esse paciente existe?" antes de criar uma consulta é feita no `graphql-api`, que é o único que fala com os dois.
-- Ao criar ou editar uma consulta, publica um evento `ConsultaEvent` no RabbitMQ (routing key `consulta.created` ou `consulta.updated`).
+```mermaid
+sequenceDiagram
+    actor E as Enfermeiro
+    participant G as graphql-api
+    participant P as patient-service
+    participant A as agendamento-service
+    participant R as RabbitMQ
+    participant N as notificacao-service
+    E->>G: mutation agendarConsulta + JWT
+    G->>P: FindById(patientId)
+    P-->>G: Patient
+    G->>A: Create
+    A->>A: validar e persistir
+    A->>R: consulta.created
+    A-->>G: Consulta
+    G-->>E: resultado GraphQL
+    R->>N: ConsultaEvent
+    N->>N: validar e registrar lembrete no log
+```
 
-### `notificacao-service` — consumidor de eventos (sem porta exposta)
-- Não tem banco de dados, não expõe nenhuma API (nem HTTP, nem gRPC) — só um `@RabbitListener` ouvindo a `notificacao.queue`.
-- Ao receber um evento, "envia o lembrete" ao paciente (simulado via log estruturado, já que não há integração real de SMS/e-mail).
+## Segurança e contratos
 
-## Comunicação Assíncrona (RabbitMQ)
+`POST /auth/login` recebe `{"username":"...","password":"..."}` e devolve `{"token":"..."}`. Use `Authorization: Bearer <token>` nas demais chamadas.
 
-- **Exchange**: `consulta.exchange` (tipo `topic`)
-- **Fila**: `notificacao.queue`, ligada ao exchange com o binding `consulta.*`
-- **Routing keys**: `consulta.created` (ao criar) e `consulta.updated` (ao editar) — ambas caem na mesma fila graças ao padrão `*` do binding
-- Mensagens serializadas em **JSON** (`Jackson2JsonMessageConverter`)
-- Painel de administração: `http://localhost:15672` (usuário/senha: `guest`/`guest`)
+| Operação | ADMIN | MÉDICO | ENFERMEIRO | PACIENTE |
+|---|:---:|:---:|:---:|:---:|
+| Gerenciar `/users` | ✅ | ❌ | ❌ | ❌ |
+| Consultar paciente/histórico | ❌ | ✅ qualquer | ✅ qualquer | ✅ próprio |
+| `agendarConsulta` | ❌ | ❌ | ✅ | ❌ |
+| `editarConsulta` | ❌ | ✅ | ❌ | ❌ |
 
-## Segurança
+GraphQL (`POST /graphql`, GraphiQL em `/graphiql`):
 
-Autenticação via **JWT**: `POST /auth/login` (usuário/senha) devolve um token, que deve ser enviado em `Authorization: Bearer <token>` em toda chamada ao `/graphql`. Usuários persistidos em banco (H2, `usersdb`), senha em hash BCrypt. Autorização por role, aplicada por operação GraphQL:
+- `patient(id)`
+- `consultasDoPaciente(patientId)`
+- `consultasFuturasDoPaciente(patientId)`
+- `agendarConsulta(input)`
+- `editarConsulta(input)`
 
-| Operação | Médico | Enfermeiro | Paciente |
-|---|---|---|---|
-| `patient` | ✅ (qualquer paciente) | ✅ (qualquer paciente) | ✅ só o próprio |
-| `consultasDoPaciente` / `consultasFuturasDoPaciente` | ✅ (qualquer paciente) | ✅ (qualquer paciente) | ✅ só as próprias |
-| `agendarConsulta` | ❌ | ✅ | ❌ |
-| `editarConsulta` | ✅ | ❌ | ❌ |
+REST administrativo (`ADMIN`): `POST /users` retorna `201`, `GET /users` retorna `200` e `DELETE /users/{id}` retorna `204`. Swagger UI: `http://localhost:8081/swagger-ui/index.html`.
 
-Usuários de teste (populados no banco na inicialização, senha `senha123` para todos):
+Eventos AMQP usam o exchange `consulta.exchange`, routing keys `consulta.created` e `consulta.updated`, fila `notificacao.queue` e dead-letter queue `notificacao.dlq`. O adaptador atual simula o envio do lembrete por log estruturado.
 
-| Usuário | Role | Paciente vinculado |
-|---|---|---|
-| `admin1` | ADMIN | — |
-| `medico1` | MEDICO | — |
-| `enfermeiro1` | ENFERMEIRO | — |
-| `paciente1` | PACIENTE | id 1 |
-| `paciente2` | PACIENTE | id 2 |
+## Executar
 
-### Gestão de usuários (só `ADMIN`)
-
-| Endpoint | Descrição |
-|---|---|
-| `POST /users` | cria usuário — body `{username, password, role, patientId}` |
-| `GET /users` | lista todos os usuários |
-| `DELETE /users/{id}` | remove um usuário |
-
-## Documentação da API REST (Swagger)
-
-`/auth/login` e `/users/*` (endpoints REST) documentados automaticamente via Swagger UI: `http://localhost:8081/swagger-ui/index.html`. O `/graphql` tem sua própria documentação, via GraphiQL/introspection — Swagger não se aplica a operações GraphQL.
-
-## Contratos gRPC (`.proto`)
-
-Cada `.proto` (`patient.proto`, `agendamento.proto`) é **duplicado** entre o serviço dono e o `graphql-api` — cliente e servidor geram suas próprias classes a partir do mesmo contrato, já que não existe módulo Maven compartilhado entre os projetos.
-
-## Stack técnica
-
-- Java 17, Spring Boot 4.1
-- Spring for GraphQL (`spring-boot-starter-graphql`)
-- gRPC nativo do Spring Boot 4.1 (`spring-boot-starter-grpc-server` / `spring-boot-starter-grpc-client`) + Protocol Buffers (`protobuf-maven-plugin`)
-- Spring Data JPA + H2 (um banco em memória por serviço)
-- RabbitMQ (`spring-boot-starter-amqp`) — comunicação assíncrona entre `agendamento-service` e `notificacao-service`
-- Spring Security + JWT (`io.jsonwebtoken:jjwt`)
-
-## Como rodar
-
-**Mais simples: Docker Compose**, sobe RabbitMQ + os 4 serviços juntos, na ordem certa:
+Pré-requisitos: Docker com Compose. A opção local também exige Java 17+ e RabbitMQ/PostgreSQL nas portas indicadas.
 
 ```bash
 docker compose up --build
 ```
 
-Ou local — precisa do RabbitMQ rodando antes (`docker run -d -p 5672:5672 -p 15672:15672 rabbitmq:4-management`), depois:
+Serviços expostos:
+
+- GraphQL/API: `http://localhost:8081`
+- gRPC pacientes: `localhost:9090`
+- gRPC agendamentos: `localhost:9091`
+- RabbitMQ Management: `http://localhost:15672` (`guest` / `guest`)
+- PostgreSQL: pacientes `5432`, agendamentos `5433`, autenticação `5434`
+
+Os schemas são versionados com Flyway. A massa é idempotente e inclui:
+
+| Usuário | Senha | Perfil/vínculo |
+|---|---|---|
+| `admin1` | `senha123` | ADMIN |
+| `medico1` | `senha123` | MEDICO |
+| `enfermeiro1` | `senha123` | ENFERMEIRO |
+| `paciente1` | `senha123` | PACIENTE / paciente 1 |
+| `paciente2` | `senha123` | PACIENTE / paciente 2 |
+
+Também existem dois pacientes, uma consulta passada e duas futuras. Essas credenciais são exclusivamente acadêmicas; configure `JWT_SECRET` e senhas próprias fora do ambiente local.
+
+Para execução sem Docker, inicie os três PostgreSQL e o RabbitMQ, configure as variáveis descritas em `application.properties` e execute cada serviço em um terminal:
 
 ```bash
-cd patient-service && ./mvnw spring-boot:run
-cd agendamento-service && ./mvnw spring-boot:run
-cd notificacao-service && ./mvnw spring-boot:run
-cd graphql-api && ./mvnw spring-boot:run
+./mvnw spring-boot:run
 ```
 
-GraphQL: `http://localhost:8081/graphql` — GraphiQL: `http://localhost:8081/graphiql`
+## Testar
 
-## Status dos requisitos da documentação do desafio
+Cada módulo possui gate JaCoCo mínimo de 95% para linhas e branches. Apenas classes geradas pelo Protobuf são excluídas.
 
-| Requisito | Status |
-|---|---|
-| GraphQL (consultas flexíveis, histórico/futuras) | ✅ |
-| Serviço de Agendamento (criar/editar consulta) | ✅ |
-| Separação em serviços — Agendamento | ✅ |
-| Separação em serviços — Notificações | ✅ |
-| Segurança (Spring Security + níveis de acesso) | ✅ |
-| Comunicação assíncrona (RabbitMQ/Kafka) | ✅ RabbitMQ |
-| Collection Postman/Insomnia | ✅ [`CareSync.postman_collection.json`](CareSync.postman_collection.json) |
+```bash
+cd patient-service && ./mvnw clean verify
+cd agendamento-service && ./mvnw clean verify
+cd notificacao-service && ./mvnw clean verify
+cd graphql-api && ./mvnw clean verify
+```
+
+Relatórios: `<serviço>/target/site/jacoco/index.html`.
+
+Teste funcional completo:
+
+```bash
+npx newman run CareSync.postman_collection.json
+```
+
+A collection autentica todos os perfis, cria e remove usuário, valida isolamento de paciente, consulta histórico e futuras, agenda e edita uma consulta usando IDs/datas dinâmicos e cobre autenticação, autorização e entradas inválidas.
+
+Para reiniciar também os dados locais:
+
+```bash
+docker compose down -v
+docker compose up --build
+```
+
+## Decisões e limites
+
+- Cada serviço persistente é dono de seu banco; não há joins entre microsserviços.
+- O `notificacao-service` permanece stateless e a entrega externa é uma porta substituível; e-mail/SMS não fazem parte desta versão.
+- Datas usam ISO-8601 local, por exemplo `2026-10-01T14:30:00`; novas consultas precisam estar no futuro.
+- Status aceitos: `SCHEDULED`, `COMPLETED` e `CANCELLED`.
+- Falhas permanentes no consumo RabbitMQ seguem para `notificacao.dlq` após três tentativas.
+
+A documentação técnica completa está em `output/pdf/caresync-documentacao.pdf`.

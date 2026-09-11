@@ -1,29 +1,23 @@
 package graphql_api.config;
 
-import graphql_api.domain.AppUserEntity;
+import graphql_api.application.port.in.UserManagementUseCase;
+import graphql_api.application.port.out.UserRepositoryPort;
 import graphql_api.domain.UserRole;
-import graphql_api.repository.AppUserRepository;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Component;
+import org.springframework.context.annotation.*;
 
-@Component
-public class UserDataSeeder implements CommandLineRunner {
-
-    private final AppUserRepository appUserRepository;
-    private final PasswordEncoder passwordEncoder;
-
-    public UserDataSeeder(AppUserRepository appUserRepository, PasswordEncoder passwordEncoder) {
-        this.appUserRepository = appUserRepository;
-        this.passwordEncoder = passwordEncoder;
+@Configuration
+public class UserDataSeeder {
+    @Bean CommandLineRunner seedUsers(UserRepositoryPort repository, UserManagementUseCase users) {
+        return args -> {
+            seed(repository, users, "admin1", UserRole.ADMIN, null);
+            seed(repository, users, "medico1", UserRole.MEDICO, null);
+            seed(repository, users, "enfermeiro1", UserRole.ENFERMEIRO, null);
+            seed(repository, users, "paciente1", UserRole.PACIENTE, 1L);
+            seed(repository, users, "paciente2", UserRole.PACIENTE, 2L);
+        };
     }
-
-    @Override
-    public void run(String... args) {
-        appUserRepository.save(new AppUserEntity("admin1", passwordEncoder.encode("senha123"), UserRole.ADMIN, null));
-        appUserRepository.save(new AppUserEntity("medico1", passwordEncoder.encode("senha123"), UserRole.MEDICO, null));
-        appUserRepository.save(new AppUserEntity("enfermeiro1", passwordEncoder.encode("senha123"), UserRole.ENFERMEIRO, null));
-        appUserRepository.save(new AppUserEntity("paciente1", passwordEncoder.encode("senha123"), UserRole.PACIENTE, 1L));
-        appUserRepository.save(new AppUserEntity("paciente2", passwordEncoder.encode("senha123"), UserRole.PACIENTE, 2L));
+    private static void seed(UserRepositoryPort repository, UserManagementUseCase users, String username, UserRole role, Long patientId) {
+        if (!repository.existsByUsername(username)) users.create(username, "senha123", role, patientId);
     }
 }
