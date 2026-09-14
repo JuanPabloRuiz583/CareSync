@@ -32,7 +32,9 @@ public class GraphQlExceptionHandler extends DataFetcherExceptionResolverAdapter
                 case INVALID_ARGUMENT -> ErrorType.BAD_REQUEST;
                 default -> ErrorType.INTERNAL_ERROR;
             };
-            return GraphqlErrorBuilder.newError(env).message(grpcException.getStatus().getDescription()).errorType(type).build();
+            String description = grpcException.getStatus().getDescription();
+            String message = description != null ? description : "Falha na comunicação com serviço interno";
+            return GraphqlErrorBuilder.newError(env).message(message).errorType(type).build();
         }
         return null;
     }

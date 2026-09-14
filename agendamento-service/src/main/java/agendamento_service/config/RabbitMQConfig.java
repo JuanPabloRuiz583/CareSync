@@ -3,6 +3,7 @@ package agendamento_service.config;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -16,6 +17,8 @@ public class RabbitMQConfig {
 
     public static final String EXCHANGE = "consulta.exchange";
     public static final String QUEUE = "notificacao.queue";
+    public static final String DEAD_LETTER_EXCHANGE = "notificacao.dlx";
+    public static final String DEAD_LETTER_QUEUE = "notificacao.dlq";
     public static final String ROUTING_KEY_CREATED = "consulta.created";
     public static final String ROUTING_KEY_UPDATED = "consulta.updated";
 
@@ -26,7 +29,10 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue notificacaoQueue() {
-        return new Queue(QUEUE, true);
+        return QueueBuilder.durable(QUEUE)
+                .deadLetterExchange(DEAD_LETTER_EXCHANGE)
+                .deadLetterRoutingKey(DEAD_LETTER_QUEUE)
+                .build();
     }
 
     @Bean

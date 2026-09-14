@@ -10,6 +10,8 @@ import static org.mockito.Mockito.*;
 class ConfigsTest {
     @Test void buildsRabbitComponents() {
         var c=new RabbitMQConfig(); var exchange=c.consultaExchange(); var queue=c.notificacaoQueue(); var converter=c.messageConverter();
+        assertThat(queue.getArguments()).containsEntry("x-dead-letter-exchange", RabbitMQConfig.DEAD_LETTER_EXCHANGE)
+                .containsEntry("x-dead-letter-routing-key", RabbitMQConfig.DEAD_LETTER_QUEUE);
         assertThat(c.binding(queue,exchange)).isNotNull(); assertThat(c.rabbitTemplate(mock(ConnectionFactory.class),converter)).isNotNull();
     }
     @Test void buildsUseCase() {
