@@ -20,7 +20,7 @@ public class PatientController {
     }
 
     @QueryMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAnyRole('MEDICO','ENFERMEIRO','PACIENTE')")
     public Patient patient(@Argument Long id) {
         AppUserDetails principal = (AppUserDetails) SecurityContextHolder.getContext()
                 .getAuthentication()

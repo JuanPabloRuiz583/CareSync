@@ -1,0 +1,5 @@
+CREATE TABLE patients (
+    id BIGINT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    email VARCHAR(180) NOT NULL UNIQUE
+);
